@@ -33,3 +33,8 @@ dist-ssr
 
 # Media binaries
 *.mp4
+.vercel
+
+# Local backend / experimental python repos
+tts_backend/
+indic_tts_repo/

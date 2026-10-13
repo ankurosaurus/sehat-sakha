@@ -1,5 +1,6 @@
 {
-  "name": "medical-simplifier",
+  "name": "sehat-sakha",
+  "description": "Sehat Sakha — Aapki Report, Aapki Bhasha Mein",
   "private": true,
   "version": "0.0.0",
   "type": "module",

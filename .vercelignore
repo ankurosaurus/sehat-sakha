@@ -1,0 +1,16 @@
+node_modules
+tts_backend
+indic_tts_repo
+.git
+.vscode
+.firebase
+dist
+dist-ssr
+*.log
+docs
+*.test.cjs
+*.test.js
+*.test.ts
+.env
+.env.*
+!.env.example
