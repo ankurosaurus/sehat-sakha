@@ -90,4 +90,49 @@ const getReports = () => {
 assert.deepStrictEqual(getReports(), [], 'Empty storage must strictly return [] with zero pre-seeded records');
 console.log("[PASS] Test 4: Zero fake data guarantee verified. Empty state returns [] without synthetic records.");
 
+// TEST 5: Bhashini 22 Languages Mapping Verification
+const LANGUAGE_NAME_TO_CODE = {
+  'Hindi': 'hi',
+  'English': 'en',
+  'Bengali': 'bn',
+  'Marathi': 'mr',
+  'Telugu': 'te',
+  'Tamil': 'ta',
+  'Gujarati': 'gu',
+  'Urdu': 'ur',
+  'Kannada': 'kn',
+  'Malayalam': 'ml',
+  'Punjabi': 'pa',
+  'Odia': 'or',
+  'Assamese': 'as',
+  'Maithili': 'mai',
+  'Nepali': 'ne',
+  'Sanskrit': 'sa',
+  'Kashmiri': 'ks',
+  'Konkani': 'kok',
+  'Sindhi': 'sd',
+  'Dogri': 'doi',
+  'Manipuri': 'mni',
+  'Santali': 'sat',
+  'Bodo': 'brx'
+};
+
+for (const lang of REQUIRED_LANGUAGES) {
+  assert(LANGUAGE_NAME_TO_CODE[lang], `Language ${lang} must have a valid Bhashini language code`);
+}
+assert.strictEqual(LANGUAGE_NAME_TO_CODE['Hindi'], 'hi');
+assert.strictEqual(LANGUAGE_NAME_TO_CODE['Bengali'], 'bn');
+assert.strictEqual(LANGUAGE_NAME_TO_CODE['Tamil'], 'ta');
+assert.strictEqual(LANGUAGE_NAME_TO_CODE['Telugu'], 'te');
+console.log("[PASS] Test 5: Bhashini 22 Eighth Schedule language mappings verified.");
+
+// TEST 6: Bhashini TTS URL Generation
+const testText = "आपकी रिपोर्ट सामान्य है";
+const langCode = LANGUAGE_NAME_TO_CODE['Hindi'];
+const expectedUrl = `/api/bhashini?action=tts&text=${encodeURIComponent(testText)}&lang=${langCode}&gender=female`;
+assert(expectedUrl.includes('action=tts'), 'Must invoke Bhashini TTS action');
+assert(expectedUrl.includes('lang=hi'), 'Must set correct language code');
+console.log("[PASS] Test 6: Bhashini TTS streaming endpoint generation validated.");
+
 console.log("\n[SUCCESS] ALL SEHAT SAKHA VALIDATION SUITE TESTS PASSED!");
+

@@ -86,6 +86,8 @@ export async function fileToGenerativePart(file: File): Promise<{ inlineData: { 
   }
 }
 
+import { bhashiniOcr, getBhashiniLangCode } from "./bhashini";
+
 export interface ExtractedReportData {
   reportTitle: string;
   hindiTitle: string;
@@ -99,9 +101,13 @@ export interface ExtractedReportData {
 
 /**
  * Reads the actual uploaded report document/image using Gemini multimodal OCR
- * and extracts all real patient and test parameters.
+ * + Digital India Bhashini OCR and extracts all real patient and test parameters in the target language.
  */
-export async function extractMedicalParametersFromFiles(files: File[], apiKey: string): Promise<ExtractedReportData> {
+export async function extractMedicalParametersFromFiles(
+  files: File[],
+  apiKey: string,
+  targetLanguage: string = 'Hindi'
+): Promise<ExtractedReportData> {
   const cleanKey = apiKey.trim();
   if (!isValidApiKey(cleanKey)) {
     throw new Error("Invalid or missing Google Gemini API key. Please configure your key in settings.");
@@ -110,8 +116,32 @@ export async function extractMedicalParametersFromFiles(files: File[], apiKey: s
   const genAI = new GoogleGenerativeAI(cleanKey);
   const fileParts = await Promise.all(files.map(fileToGenerativePart));
 
+  // Run Bhashini OCR on the first image file if available for hybrid accuracy
+  let bhashiniOcrText = '';
+  try {
+    const firstImg = files.find(f => f.type.startsWith('image/') || /\.(jpg|jpeg|png|webp)$/i.test(f.name));
+    if (firstImg) {
+      const reader = new FileReader();
+      const base64Promise = new Promise<string>((resolve) => {
+        reader.onloadend = () => {
+          const res = reader.result as string;
+          resolve(res.includes(',') ? res.split(',')[1] : res);
+        };
+        reader.readAsDataURL(firstImg);
+      });
+      const b64 = await base64Promise;
+      if (b64) {
+        bhashiniOcrText = await bhashiniOcr(b64, getBhashiniLangCode(targetLanguage));
+      }
+    }
+  } catch (ocrErr) {
+    console.warn('Optional Bhashini OCR pass skipped:', ocrErr);
+  }
+
+  const bhashiniOcrHint = bhashiniOcrText ? `\n\nDIGITAL INDIA BHASHINI OCR RECOGNIZED TEXT ON DOCUMENT:\n"""${bhashiniOcrText.slice(0, 2000)}"""\n` : '';
+
   const extractionPrompt = `You are a precision clinical laboratory document extraction system.
-Analyze the attached medical laboratory report image(s) or document(s) carefully.
+Analyze the attached medical laboratory report image(s) or document(s) carefully.${bhashiniOcrHint}
 Read ALL test names, patient values, measurement units, and reference intervals printed on the document.
 
 CRITICAL EXTRACTION RULES:
@@ -119,21 +149,22 @@ CRITICAL EXTRACTION RULES:
 2. DO NOT hallucinate, fabricate, or supply synthetic placeholder data.
 3. If patient name, age, gender, lab name, or test collection date are visible on the document, extract them accurately.
 4. Extract every single laboratory biomarker parameter that appears on the report.
-5. For each parameter:
+5. Provide localized titles and names in: **${targetLanguage}** (with native script).
+6. For each parameter:
    - "name": Full English biomarker name as printed (e.g. "Hemoglobin", "Total Leukocyte Count (WBC)", "Platelet Count", "Serum Creatinine", "Fasting Blood Sugar", "Total Cholesterol", "SGPT (ALT)", "Thyroid Stimulating Hormone (TSH)")
-   - "hindiName": A clear, respectful Hindi translation in Devanagari script (e.g. "हीमोग्लोबिन (खून का स्तर)", "सफेद रक्त कोशिकाएं (रोग प्रतिरोधक क्षमता)", "ब्लड शुगर", "कोलेस्ट्रॉल")
+   - "hindiName": A clear, respectful translation in **${targetLanguage}** script (e.g. for Hindi: "हीमोग्लोबिन (खून का स्तर)", for Bengali: "হিমোগ্লোবিন", for Tamil: "ஹீமோகுளோபின்", for Telugu: "హిమోగ్లోబిన్")
    - "value": The measured numeric value as a number (e.g. 11.2). If a test is qualitative (like "Positive" or "Negative"), put 0 for value and describe it in the explanation.
    - "unit": The unit of measurement (e.g. "g/dL", "mg/dL", "/mcL", "U/L", "mIU/L", "%")
    - "rangeText": The reference range printed on the report (e.g. "13.5 - 17.5", "< 200", "70 - 100", "0.7 - 1.3")
    - "rangeLow": Numeric lower limit if a two-sided range is provided
    - "rangeHigh": Numeric upper limit if a range is provided
    - "simpleExplanationEn": 1 short sentence in simple English explaining what this marker represents in the body.
-   - "simpleExplanationHi": 1 short sentence in simple Hindi explaining what this marker represents in the body.
+   - "simpleExplanationHi": 1 short sentence in **${targetLanguage}** explaining what this marker represents in the body.
 
 You MUST return ONLY valid, raw JSON (no conversational text, no markdown backticks):
 {
   "reportTitle": "Complete Blood Count (CBC)",
-  "hindiTitle": "कम्प्लीट ब्लड काउंट (सीबीसी)",
+  "hindiTitle": "Localized Report Title in ${targetLanguage}",
   "patientName": "Patient Name",
   "patientAge": 45,
   "patientGender": "Male/Female",
@@ -142,14 +173,14 @@ You MUST return ONLY valid, raw JSON (no conversational text, no markdown backti
   "parameters": [
     {
       "name": "Hemoglobin",
-      "hindiName": "हीमोग्लोबिन (खून का स्तर)",
+      "hindiName": "Localized Parameter Name in ${targetLanguage}",
       "value": 11.2,
       "unit": "g/dL",
       "rangeText": "13.5 - 17.5",
       "rangeLow": 13.5,
       "rangeHigh": 17.5,
       "simpleExplanationEn": "Carries oxygen from lungs to body tissues.",
-      "simpleExplanationHi": "फेफड़ों से शरीर की कोशिकाओं तक ऑक्सीजन पहुंचाने का काम करता है।"
+      "simpleExplanationHi": "Short explanation in ${targetLanguage}."
     }
   ]
 }`;

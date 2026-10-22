@@ -151,12 +151,13 @@ export function getReportOverviewStats(parameters: LabParameter[]) {
 /**
  * Human-friendly bilingual status labels and colors.
  */
-export function getStatusDisplay(status: ClassificationStatus, language: 'English' | 'Hindi') {
+export function getStatusDisplay(status: ClassificationStatus, language: string = 'Hindi') {
+  const isEnglish = language === 'English';
   switch (status) {
     case 'normal':
       return {
-        label: language === 'Hindi' ? 'सामान्य सीमा में' : 'Within Normal Range',
-        sublabel: language === 'Hindi' ? 'सुरक्षित स्तर' : 'Healthy Level',
+        label: isEnglish ? 'Within Normal Range' : 'सामान्य सीमा में',
+        sublabel: isEnglish ? 'Healthy Level' : 'सुरक्षित स्तर',
         badgeClass: 'badge-normal',
         color: '#15803d',
         bgColor: '#dcfce7',
@@ -164,8 +165,8 @@ export function getStatusDisplay(status: ClassificationStatus, language: 'Englis
       };
     case 'high':
       return {
-        label: language === 'Hindi' ? 'सामान्य से अधिक' : 'Above Normal Range',
-        sublabel: language === 'Hindi' ? 'डॉक्टर से परामर्श लें' : 'Consult Doctor',
+        label: isEnglish ? 'Above Normal Range' : 'सामान्य से अधिक',
+        sublabel: isEnglish ? 'Consult Doctor' : 'डॉक्टर से परामर्श लें',
         badgeClass: 'badge-high',
         color: '#b91c1c',
         bgColor: '#fee2e2',
@@ -173,8 +174,8 @@ export function getStatusDisplay(status: ClassificationStatus, language: 'Englis
       };
     case 'low':
       return {
-        label: language === 'Hindi' ? 'सामान्य से कम' : 'Below Normal Range',
-        sublabel: language === 'Hindi' ? 'कम स्तर' : 'Low Level',
+        label: isEnglish ? 'Below Normal Range' : 'सामान्य से कम',
+        sublabel: isEnglish ? 'Low Level' : 'कम स्तर',
         badgeClass: 'badge-low',
         color: '#b45309',
         bgColor: '#fef3c7',
@@ -183,8 +184,8 @@ export function getStatusDisplay(status: ClassificationStatus, language: 'Englis
     case 'indeterminate':
     default:
       return {
-        label: language === 'Hindi' ? 'अस्पष्ट / समीक्षा आवश्यक' : 'Indeterminate Range',
-        sublabel: language === 'Hindi' ? 'जांच आवश्यक' : 'Review Needed',
+        label: isEnglish ? 'Indeterminate Range' : 'अस्पष्ट / समीक्षा आवश्यक',
+        sublabel: isEnglish ? 'Review Needed' : 'जांच आवश्यक',
         badgeClass: 'badge-indeterminate',
         color: '#475569',
         bgColor: '#f1f5f9',

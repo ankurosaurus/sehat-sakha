@@ -4,7 +4,7 @@ import { Stethoscope, Volume2, Copy, Check, Printer } from 'lucide-react';
 interface DoctorQuestionsProps {
   questionsEn: string[];
   questionsHi: string[];
-  language: 'English' | 'Hindi';
+  language: string;
 }
 
 export const DoctorQuestions: React.FC<DoctorQuestionsProps> = ({
@@ -12,7 +12,7 @@ export const DoctorQuestions: React.FC<DoctorQuestionsProps> = ({
   questionsHi,
   language
 }) => {
-  const isHindi = language === 'Hindi';
+  const isHindi = language !== 'English';
   const questions = isHindi ? questionsHi : questionsEn;
   const [copied, setCopied] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);

@@ -37,6 +37,8 @@ export interface ReportSummary {
   savedAt: string;
   savedDateFormatted?: string;
   savedTimeFormatted?: string;
+  languageCode?: string;
+  languageName?: string;
 }
 
 export interface ChatMessage {
@@ -46,4 +48,6 @@ export interface ChatMessage {
   textHi: string;
   timestamp: string;
   suggestedAction?: string;
+  detectedLang?: string;
+  detectedEngine?: string;
 }

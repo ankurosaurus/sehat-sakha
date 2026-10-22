@@ -4,7 +4,7 @@ import type { LabParameter } from '../types';
 
 interface BuildingBarGraphProps {
   parameters: LabParameter[];
-  language: 'English' | 'Hindi';
+  language: string;
   onSelectParam?: (param: LabParameter) => void;
 }
 
@@ -13,7 +13,7 @@ export const BuildingBarGraph: React.FC<BuildingBarGraphProps> = ({
   language,
   onSelectParam
 }) => {
-  const isHindi = language === 'Hindi';
+  const isHindi = language !== 'English';
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   if (!parameters || parameters.length === 0) return null;

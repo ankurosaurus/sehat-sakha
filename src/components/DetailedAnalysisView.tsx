@@ -10,7 +10,7 @@ import { TrendGraph } from './TrendGraph';
 
 interface DetailedAnalysisViewProps {
   report: ReportSummary;
-  language: 'English' | 'Hindi';
+  language: string;
   onBackToSimple: () => void;
   onAskSakhaForParam: (param: LabParameter) => void;
 }
@@ -21,7 +21,7 @@ export const DetailedAnalysisView: React.FC<DetailedAnalysisViewProps> = ({
   onBackToSimple,
   onAskSakhaForParam
 }) => {
-  const isHindi = language === 'Hindi';
+  const isHindi = language !== 'English';
 
   return (
     <div className="results-card" style={{ padding: '1.5rem', backgroundColor: '#ffffff', borderRadius: '18px', border: '1.5px solid #e2e8f0' }}>

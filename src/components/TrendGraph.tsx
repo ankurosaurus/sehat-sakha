@@ -5,11 +5,11 @@ import { getHistoricalParameterValues } from '../lib/storage';
 
 interface TrendGraphProps {
   parameters: LabParameter[];
-  language: 'English' | 'Hindi';
+  language: string;
 }
 
 export const TrendGraph: React.FC<TrendGraphProps> = ({ parameters, language }) => {
-  const isHindi = language === 'Hindi';
+  const isHindi = language !== 'English';
 
   // Check if any parameter has historical data recorded in storage or on the parameter itself
   const paramsWithHistory: Array<{

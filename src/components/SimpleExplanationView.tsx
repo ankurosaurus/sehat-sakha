@@ -21,7 +21,7 @@ import { speechEngine, type SpeechControllerState } from '../lib/speech';
 
 interface SimpleExplanationViewProps {
   report: ReportSummary;
-  language: 'English' | 'Hindi';
+  language: string;
   onOpenDetailed: () => void;
   onSaveToVault: () => void;
   savedInVault: boolean;
@@ -34,7 +34,7 @@ export const SimpleExplanationView: React.FC<SimpleExplanationViewProps> = ({
   onSaveToVault,
   savedInVault
 }) => {
-  const isHindi = language === 'Hindi';
+  const isHindi = language !== 'English';
   const [copied, setCopied] = useState(false);
 
   // Audio Playback State

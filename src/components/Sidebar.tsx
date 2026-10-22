@@ -19,7 +19,7 @@ interface SidebarProps {
   activeView: NavView;
   onNavigate: (view: NavView) => void;
   hasActiveReport: boolean;
-  language: 'English' | 'Hindi';
+  language: string;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -30,7 +30,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   hasActiveReport,
   language
 }) => {
-  const isHindi = language === 'Hindi';
+  const isHindi = language !== 'English';
 
   const menuItems: Array<{
     id: NavView;

@@ -5,7 +5,7 @@ import { classifyValue } from '../lib/referenceEngine';
 
 interface ExtractionReviewProps {
   parameters: LabParameter[];
-  language: 'English' | 'Hindi';
+  language: string;
   onConfirm: (confirmedParams: LabParameter[]) => void;
   onCancel: () => void;
 }
@@ -16,7 +16,7 @@ export const ExtractionReview: React.FC<ExtractionReviewProps> = ({
   onConfirm,
   onCancel
 }) => {
-  const isHindi = language === 'Hindi';
+  const isHindi = language !== 'English';
   const [params, setParams] = useState<LabParameter[]>(parameters);
   const [editingId, setEditingId] = useState<string | null>(null);
 

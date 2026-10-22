@@ -5,7 +5,7 @@ import type { LabParameter } from '../types';
 
 interface ReportOverviewBarProps {
   parameters: LabParameter[];
-  language: 'English' | 'Hindi';
+  language: string;
 }
 
 export const ReportOverviewBar: React.FC<ReportOverviewBarProps> = ({ parameters, language }) => {
@@ -17,7 +17,7 @@ export const ReportOverviewBar: React.FC<ReportOverviewBarProps> = ({ parameters
   const lowPct = (stats.low / total) * 100;
   const indetPct = (stats.indeterminate / total) * 100;
 
-  const isHindi = language === 'Hindi';
+  const isHindi = language !== 'English';
 
   return (
     <div

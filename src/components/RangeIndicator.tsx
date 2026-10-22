@@ -4,12 +4,12 @@ import { calculateRangePosition, getStatusDisplay } from '../lib/referenceEngine
 
 interface RangeIndicatorProps {
   param: LabParameter;
-  language: 'English' | 'Hindi';
+  language: string;
   onAskSakha?: (param: LabParameter) => void;
 }
 
 export const RangeIndicator: React.FC<RangeIndicatorProps> = ({ param, language, onAskSakha }) => {
-  const isHindi = language === 'Hindi';
+  const isHindi = language !== 'English';
   const statusDisplay = getStatusDisplay(param.status, language);
   const positionPercent = calculateRangePosition(param.value, param.rangeLow, param.rangeHigh);
 

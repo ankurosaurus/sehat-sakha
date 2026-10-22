@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Languages, X, Check, Volume2, Search, AlertCircle } from 'lucide-react';
+import { Languages, X, Check, Volume2, Search, Sparkles } from 'lucide-react';
 import { INDIAN_LANGUAGES, checkBrowserVoiceSupport, type LanguageInfo } from '../lib/languages';
 import { speechEngine } from '../lib/speech';
 
 interface LanguageSelectorModalProps {
   isOpen: boolean;
   onClose: () => void;
-  currentLanguage: 'Hindi' | 'English';
-  onSelectLanguage: (lang: 'Hindi' | 'English') => void;
+  currentLanguage: string;
+  onSelectLanguage: (lang: string) => void;
 }
 
 export const LanguageSelectorModal: React.FC<LanguageSelectorModalProps> = ({
@@ -32,7 +32,8 @@ export const LanguageSelectorModal: React.FC<LanguageSelectorModalProps> = ({
     l =>
       l.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       l.nativeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      l.script.toLowerCase().includes(searchTerm.toLowerCase())
+      l.script.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      l.code.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -54,7 +55,7 @@ export const LanguageSelectorModal: React.FC<LanguageSelectorModalProps> = ({
           backgroundColor: '#ffffff',
           borderRadius: '20px',
           width: '100%',
-          maxWidth: '680px',
+          maxWidth: '740px',
           maxHeight: '90vh',
           display: 'flex',
           flexDirection: 'column',
@@ -75,14 +76,33 @@ export const LanguageSelectorModal: React.FC<LanguageSelectorModalProps> = ({
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
             <div style={{ backgroundColor: '#ecfdf5', color: '#059669', padding: '0.5rem', borderRadius: '10px' }}>
-              <Languages size={22} />
+              <Languages size={24} />
             </div>
             <div>
-              <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#064e3b' }}>
-                {isHindi ? 'भारत की 22 आधिकारिक भाषाएं (8वीं अनुसूची)' : '22 Official Languages of India'}
-              </h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#064e3b' }}>
+                  {isHindi ? 'भारत की 22 आधिकारिक भाषाएं (8वीं अनुसूची)' : '22 Official Languages of India'}
+                </h3>
+                <span
+                  style={{
+                    backgroundColor: '#dbeafe',
+                    color: '#1e40af',
+                    fontSize: '0.72rem',
+                    fontWeight: 700,
+                    padding: '0.15rem 0.55rem',
+                    borderRadius: '999px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.25rem'
+                  }}
+                >
+                  <Sparkles size={11} /> भाषिणी AI संचालित
+                </span>
+              </div>
               <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
-                {isHindi ? 'अपनी सुविधानुसार पसंदीदा भाषा चुनें' : 'Select your preferred language'}
+                {isHindi
+                  ? 'अपनी पसंदीदा भाषा चुनें — सरल अनुवाद, दृश्य रिपोर्ट और डिजिटल इंडिया भाषिणी आवाज़ उपलब्ध'
+                  : 'Select your preferred language — Simplified explanations and Bhashini AI voice ready'}
               </p>
             </div>
           </div>
@@ -107,7 +127,7 @@ export const LanguageSelectorModal: React.FC<LanguageSelectorModalProps> = ({
             <Search size={18} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
             <input
               type="text"
-              placeholder={isHindi ? 'भाषा या लिपि खोजें (उदा: हिन्दी, বাংলা, Tamil)...' : 'Search language or script...'}
+              placeholder={isHindi ? 'भाषा या लिपि खोजें (उदा: हिन्दी, বাংলা, தமிழ், मराठी, తెలుగు)...' : 'Search language or script (e.g. Hindi, Bengali, Tamil, Telugu, Marathi)...'}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               style={{
@@ -123,29 +143,28 @@ export const LanguageSelectorModal: React.FC<LanguageSelectorModalProps> = ({
         </div>
 
         {/* Language Grid */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '1rem 1.5rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '0.75rem' }}>
+        <div
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            padding: '1rem 1.5rem',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+            gap: '0.75rem'
+          }}
+        >
           {filtered.map((lang: LanguageInfo) => {
-            const isSelected = (currentLanguage === 'Hindi' && lang.code === 'hi') || (currentLanguage === 'English' && lang.code === 'en');
-            const hasVoice = checkBrowserVoiceSupport(lang.bcp47, availableVoices);
-            const isReady = lang.hasUiText;
+            const isSelected =
+              currentLanguage.toLowerCase() === lang.name.toLowerCase() ||
+              currentLanguage.toLowerCase() === lang.code.toLowerCase();
+            const hasBrowserVoice = checkBrowserVoiceSupport(lang.bcp47, availableVoices);
 
             return (
               <div
                 key={lang.code}
                 onClick={() => {
-                  if (lang.code === 'hi') {
-                    onSelectLanguage('Hindi');
-                    onClose();
-                  } else if (lang.code === 'en') {
-                    onSelectLanguage('English');
-                    onClose();
-                  } else {
-                    alert(
-                      isHindi
-                        ? `${lang.nativeName} (${lang.name}) के लिए सरल अनुवाद और आवाज़ तैयार की जा रही है। वर्तमान में हिंदी और अंग्रेजी पूर्णतः उपलब्ध हैं।`
-                        : `Support for ${lang.nativeName} (${lang.name}) is currently under active development. Hindi and English are fully supported.`
-                    );
-                  }
+                  onSelectLanguage(lang.name);
+                  onClose();
                 }}
                 style={{
                   padding: '0.85rem 1rem',
@@ -189,25 +208,17 @@ export const LanguageSelectorModal: React.FC<LanguageSelectorModalProps> = ({
                       borderRadius: '4px',
                       fontSize: '0.72rem',
                       fontWeight: 700,
-                      backgroundColor: isReady ? '#dcfce7' : '#f1f5f9',
-                      color: isReady ? '#15803d' : '#64748b'
+                      backgroundColor: '#dcfce7',
+                      color: '#15803d'
                     }}
                   >
-                    {isReady ? (
-                      <>
-                        <Volume2 size={12} /> {isHindi ? 'सक्रिय' : 'Ready'}
-                      </>
-                    ) : (
-                      <>
-                        <AlertCircle size={12} /> {isHindi ? 'जल्द आ रहा है' : 'Soon'}
-                      </>
-                    )}
+                    <Volume2 size={12} /> भाषिणी AI
                   </span>
                 </div>
 
-                <div style={{ fontSize: '0.72rem', color: isReady ? '#047857' : '#94a3b8', fontWeight: 500 }}>
+                <div style={{ fontSize: '0.72rem', color: '#047857', fontWeight: 500 }}>
                   {isHindi ? lang.statusNoteHi : lang.statusNoteEn}
-                  {hasVoice && isReady && ' • डिवाइस आवाज़ उपलब्ध'}
+                  {hasBrowserVoice && ' • डिवाइस आवाज़'}
                 </div>
               </div>
             );
@@ -228,7 +239,7 @@ export const LanguageSelectorModal: React.FC<LanguageSelectorModalProps> = ({
           }}
         >
           <span>
-            {isHindi ? 'सत्यनिष्ठा: किसी भी भाषा के लिए अवास्तविक दावा नहीं किया जाता।' : 'Capability honesty: No unverified voice claims.'}
+            🇮🇳 <strong>डिजिटल इंडिया भाषिणी (Digital India Bhashini)</strong> — राष्ट्रीय भाषा अनुवाद मिशन द्वारा समर्थित।
           </span>
           <button
             onClick={onClose}

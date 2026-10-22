@@ -30,6 +30,8 @@ import { SimpleExplanationView } from './components/SimpleExplanationView';
 import { DetailedAnalysisView } from './components/DetailedAnalysisView';
 import { saveReportToVault } from './lib/storage';
 import { speechEngine } from './lib/speech';
+import { getLanguageByCode } from './lib/languages';
+import { getBhashiniLangCode } from './lib/bhashini';
 import type { LabParameter, ReportSummary } from './types';
 
 function App() {
@@ -39,9 +41,9 @@ function App() {
   const [languageModalOpen, setLanguageModalOpen] = useState(false);
   const [reportViewMode, setReportViewMode] = useState<'simple' | 'detailed'>('simple');
 
-  // Language
-  const [language, setLanguage] = useState<'English' | 'Hindi'>('Hindi');
-  const isHindi = language === 'Hindi';
+  // Language (Supports all 22 Indian Languages powered by Bhashini)
+  const [language, setLanguage] = useState<string>('Hindi');
+  const isHindi = language !== 'English';
 
   // Files & Review State
   const [files, setFiles] = useState<File[]>([]);
@@ -161,8 +163,8 @@ function App() {
           : "Please enter your Google Gemini API key so the AI can read and extract data from your report.");
       }
 
-      // Live multimodal Gemini document extraction
-      const extractedData = await extractMedicalParametersFromFiles(files, currentKey);
+      // Live multimodal Gemini + Digital India Bhashini OCR document extraction
+      const extractedData = await extractMedicalParametersFromFiles(files, currentKey, language);
 
       if (!extractedData.parameters || extractedData.parameters.length === 0) {
         throw new Error(isHindi
@@ -215,6 +217,8 @@ function App() {
         savedTimeFormatted: timeFormatted,
         labName: extractedMeta?.labName || 'डायग्नोस्टिक लैब (Diagnostic Lab)',
         savedAt: now.toISOString(),
+        languageCode: getBhashiniLangCode(language),
+        languageName: language,
         parameters: confirmedParams,
         doctorQuestionsEn: [
           'What lifestyle or dietary adjustments do you recommend for these numbers?',
@@ -419,7 +423,7 @@ function App() {
             }}
           >
             <Languages size={16} color="#059669" />
-            <span>{isHindi ? 'हिन्दी' : 'English'}</span>
+            <span>{getLanguageByCode(language).nativeName}</span>
           </button>
         </div>
       </header>

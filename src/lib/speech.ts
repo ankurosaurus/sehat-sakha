@@ -1,12 +1,15 @@
 /**
- * Sehat Sakha - Real Spoken Audio Engine for Hindi & English
+ * Sehat Sakha - Real Spoken Audio Engine for 22 Indian Languages
+ * Powered by Digital India Bhashini (NLTM) + Google Neural + Browser Speech Fallback
  *
- * Guaranteed to speak real Hindi:
- * 1. Primary: High-fidelity natural Hindi speech streaming via /api/tts proxy (Google Neural Hindi)
- * 2. Secondary: Direct audio streaming fallback
- * 3. Tertiary: Browser Web Speech API fallback
- * 4. Progressive sentence chunking with live subtitle updates, pause, resume, and stop controls.
+ * Tier 1: Digital India Bhashini Neural TTS (/api/bhashini?action=tts)
+ * Tier 2: Google Neural TTS streaming (/api/tts)
+ * Tier 3: Browser Web Speech API fallback (SpeechSynthesisUtterance)
+ *
+ * Progressive sentence chunking with live subtitle updates, pause, resume, and stop controls.
  */
+
+import { getBhashiniLangCode } from './bhashini';
 
 export interface SpeechControllerState {
   isPlaying: boolean;
@@ -29,7 +32,7 @@ class SpeechEngine {
   private onSentenceCb?: SentenceCallback;
   private onEndCb?: EndCallback;
   private onErrorCb?: ErrorCallback;
-  private selectedLang: 'Hindi' | 'English' = 'Hindi';
+  private selectedLang: string = 'Hindi';
   private browserVoices: SpeechSynthesisVoice[] = [];
 
   constructor() {
@@ -55,9 +58,9 @@ class SpeechEngine {
   }
 
   /**
-   * Sanitizes markdown artifacts and expands technical medical units into clear Hindi
+   * Sanitizes markdown artifacts and expands technical medical units into clear spoken words
    */
-  public sanitizeMedicalText(rawText: string, language: 'Hindi' | 'English'): string {
+  public sanitizeMedicalText(rawText: string, language: string = 'Hindi'): string {
     if (!rawText) return '';
 
     let clean = rawText
@@ -72,7 +75,9 @@ class SpeechEngine {
       .replace(/^\s*[-•*]\s+/gm, '')
       .replace(/\r\n/g, '\n');
 
-    if (language === 'Hindi') {
+    const code = getBhashiniLangCode(language);
+
+    if (code === 'hi') {
       clean = clean
         .replace(/mg\/dL/gi, ' मिलीग्राम प्रति डेसीलीटर ')
         .replace(/g\/dL/gi, ' ग्राम प्रति डेसीलीटर ')
@@ -86,6 +91,19 @@ class SpeechEngine {
         .replace(/WBC/gi, ' सफेद रक्त कोशिकाएं ')
         .replace(/RBC/gi, ' लाल रक्त कोशिकाएं ')
         .replace(/Hb/gi, ' हीमोग्लोबिन ');
+    } else if (code === 'bn') {
+      clean = clean
+        .replace(/mg\/dL/gi, ' মিলিগ্রাম প্রতি ডেসিলিটার ')
+        .replace(/g\/dL/gi, ' গ্রাম প্রতি ডেসিলিটার ')
+        .replace(/%/g, ' শতাংশ ');
+    } else if (code === 'te') {
+      clean = clean
+        .replace(/mg\/dL/gi, ' మిల్లీగ్రాములు ప్రతి డెసిలీటర్ ')
+        .replace(/%/g, ' శాతం ');
+    } else if (code === 'ta') {
+      clean = clean
+        .replace(/mg\/dL/gi, ' மில்லிகிராம் ஒரு டெசிலிட்டருக்கு ')
+        .replace(/%/g, ' சதவீதம் ');
     }
 
     return clean;
@@ -102,7 +120,6 @@ class SpeechEngine {
 
     const sentences: string[] = [];
     for (const chunk of rawChunks) {
-      // If a single chunk is long, split on commas or pauses
       if (chunk.length > 140) {
         const parts = chunk.split(/(?<=[,;])\s+/);
         sentences.push(...parts.map(p => p.trim()).filter(p => p.length > 0));
@@ -115,11 +132,11 @@ class SpeechEngine {
   }
 
   /**
-   * Primary entry point: Speaks the text in native Hindi or English
+   * Primary entry point: Speaks the text in any of the 22 Indian languages or English
    */
   public speak(
     text: string,
-    language: 'Hindi' | 'English',
+    language: string = 'Hindi',
     callbacks?: {
       onSentence?: SentenceCallback;
       onEnd?: EndCallback;
@@ -148,7 +165,7 @@ class SpeechEngine {
 
     return {
       hasVoice: true,
-      voiceName: language === 'Hindi' ? 'Google Hindi Voice' : 'Natural English Voice'
+      voiceName: `Bhashini AI ${language} Voice`
     };
   }
 
@@ -164,10 +181,13 @@ class SpeechEngine {
     const sentence = this.sentenceQueue[this.currentIndex];
     this.onSentenceCb?.(this.currentIndex, this.sentenceQueue.length, sentence);
 
-    const langCode = this.selectedLang === 'Hindi' ? 'hi' : 'en';
+    const langCode = getBhashiniLangCode(this.selectedLang);
 
-    // 1. Try local proxy endpoint first (avoids browser CORS or referrer restrictions)
+    // Primary: Bhashini IndicTTS stream via /api/bhashini
+    const bhashiniUrl = `/api/bhashini?action=tts&text=${encodeURIComponent(sentence)}&lang=${langCode}&gender=female&format=audio`;
+    // Secondary: Direct /api/tts proxy fallback
     const proxyUrl = `/api/tts?text=${encodeURIComponent(sentence)}&lang=${langCode}`;
+    // Direct Google TTS fallback
     const directUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(sentence)}&tl=${langCode}&client=tw-ob`;
 
     const audio = new Audio();
@@ -185,28 +205,33 @@ class SpeechEngine {
 
     audio.onerror = () => {
       if (this.isCancelled) return;
-      console.warn('Audio streaming failed on sentence, attempting fallback:', sentence);
+      console.warn('Bhashini audio stream failed on sentence, trying secondary proxy:', sentence);
 
-      // Try direct Google Translate URL
-      const fallbackAudio = new Audio(directUrl);
-      this.currentAudio = fallbackAudio;
+      const secondaryAudio = new Audio(proxyUrl);
+      this.currentAudio = secondaryAudio;
+      secondaryAudio.onended = advance;
 
-      fallbackAudio.onended = advance;
-      fallbackAudio.onerror = () => {
-        // Fallback to browser SpeechSynthesis if audio streaming fails completely
-        this.fallbackToBrowserSpeech(sentence, advance);
+      secondaryAudio.onerror = () => {
+        const directAudio = new Audio(directUrl);
+        this.currentAudio = directAudio;
+        directAudio.onended = advance;
+        directAudio.onerror = () => {
+          this.fallbackToBrowserSpeech(sentence, advance);
+        };
+        directAudio.play().catch(() => {
+          this.fallbackToBrowserSpeech(sentence, advance);
+        });
       };
 
-      fallbackAudio.play().catch(() => {
+      secondaryAudio.play().catch(() => {
         this.fallbackToBrowserSpeech(sentence, advance);
       });
     };
 
-    audio.src = proxyUrl;
+    audio.src = bhashiniUrl;
     audio.play().catch((playErr) => {
-      console.warn('Proxy audio play rejected:', playErr);
-      // Try direct fallback
-      audio.src = directUrl;
+      console.warn('Bhashini audio play rejected, trying fallback:', playErr);
+      audio.src = proxyUrl;
       audio.play().catch(() => {
         this.fallbackToBrowserSpeech(sentence, advance);
       });
@@ -224,13 +249,17 @@ class SpeechEngine {
 
     try {
       const utterance = new SpeechSynthesisUtterance(sentence);
-      utterance.lang = this.selectedLang === 'Hindi' ? 'hi-IN' : 'en-US';
+      const langCode = getBhashiniLangCode(this.selectedLang);
+      utterance.lang = langCode === 'en' ? 'en-IN' : `${langCode}-IN`;
       utterance.rate = 0.92;
 
       const voices = this.getVoices();
-      if (this.selectedLang === 'Hindi') {
-        const hiVoice = voices.find(v => v.lang.toLowerCase().includes('hi') || v.name.toLowerCase().includes('hindi'));
-        if (hiVoice) utterance.voice = hiVoice;
+      const matchedVoice = voices.find(v => {
+        const vLang = v.lang.toLowerCase();
+        return vLang.startsWith(langCode) || vLang.includes(langCode);
+      });
+      if (matchedVoice) {
+        utterance.voice = matchedVoice;
       }
 
       utterance.onend = () => onDone();

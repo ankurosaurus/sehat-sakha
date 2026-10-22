@@ -4,7 +4,7 @@ import type { ReportSummary } from '../types';
 import { getSavedReports, deleteReportFromVault } from '../lib/storage';
 
 interface HealthVaultProps {
-  language: 'English' | 'Hindi';
+  language: string;
   onSelectReport: (report: ReportSummary) => void;
   onNewUpload: () => void;
 }
@@ -14,7 +14,7 @@ export const HealthVault: React.FC<HealthVaultProps> = ({
   onSelectReport,
   onNewUpload
 }) => {
-  const isHindi = language === 'Hindi';
+  const isHindi = language !== 'English';
   const [reports, setReports] = useState<ReportSummary[]>(() => getSavedReports());
   const [searchTerm, setSearchTerm] = useState<string>('');
 

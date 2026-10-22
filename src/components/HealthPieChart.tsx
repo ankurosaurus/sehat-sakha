@@ -4,11 +4,11 @@ import type { LabParameter } from '../types';
 
 interface HealthPieChartProps {
   parameters: LabParameter[];
-  language: 'English' | 'Hindi';
+  language: string;
 }
 
 export const HealthPieChart: React.FC<HealthPieChartProps> = ({ parameters, language }) => {
-  const isHindi = language === 'Hindi';
+  const isHindi = language !== 'English';
   const [hoveredSlice, setHoveredSlice] = useState<string | null>(null);
 
   if (!parameters || parameters.length === 0) return null;

@@ -1,15 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Send, Volume2, Loader2 } from 'lucide-react';
+import { X, Send, Volume2, Loader2, Sparkles } from 'lucide-react';
 import { SakhaMascot } from './SakhaMascot';
 import type { LabParameter, ReportSummary } from '../types';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { CANDIDATE_MODELS, isValidApiKey } from '../lib/gemini';
 import { speechEngine } from '../lib/speech';
+import { bhashiniDetectLanguage, LANGUAGE_CODE_TO_NAME } from '../lib/bhashini';
 
 interface AskSakhaDrawerProps {
   isOpen: boolean;
   onClose: () => void;
-  language: 'English' | 'Hindi';
+  language: string;
   currentReport?: ReportSummary | null;
   selectedParam?: LabParameter | null;
   apiKey?: string;
@@ -18,12 +19,14 @@ interface AskSakhaDrawerProps {
 interface Message {
   sender: 'user' | 'sakha';
   text: string;
+  detectedLang?: string;
+  detectedEngine?: string;
 }
 
 export const AskSakhaDrawer: React.FC<AskSakhaDrawerProps> = ({
   isOpen,
   onClose,
-  language,
+  language = 'Hindi',
   currentReport,
   selectedParam,
   apiKey = ''
@@ -33,8 +36,8 @@ export const AskSakhaDrawer: React.FC<AskSakhaDrawerProps> = ({
     {
       sender: 'sakha',
       text: isHindi
-        ? 'नमस्ते! मैं सखा हूँ। मैं आपकी मेडिकल रिपोर्ट को सरल भाषा में समझने में आपकी मदद करूँगा। आप मुझसे कोई भी सवाल पूछ सकते हैं।'
-        : "Hello! I am Sakha, your health companion. I am here to help you understand your laboratory report in simple everyday language. What would you like to know?"
+        ? 'नमस्ते! मैं सखा हूँ। मैं आपकी मेडिकल रिपोर्ट को सरल भाषा में समझने में आपकी मदद करूँगा। आप मुझसे भारत की किसी भी भाषा में सवाल पूछ सकते हैं।'
+        : `Hello! I am Sakha, your health companion. I am powered by Digital India Bhashini to explain your laboratory report in 22 Indian languages. What would you like to know?`
     }
   ]);
   const [inputVal, setInputVal] = useState<string>('');
@@ -53,7 +56,7 @@ export const AskSakhaDrawer: React.FC<AskSakhaDrawerProps> = ({
       const paramNote = isHindi
         ? `आपने **${selectedParam.name}** (${selectedParam.hindiName || ''}) चुना है (परिणाम: ${selectedParam.value} ${selectedParam.unit}, सामान्य सीमा: ${selectedParam.rangeText})। आप इसके बारे में क्या जानना चाहते हैं?`
         : `You selected **${selectedParam.name}** (Result: ${selectedParam.value} ${selectedParam.unit}, Reference Range: ${selectedParam.rangeText}). What would you like to know about it?`;
-      
+
       setMessages((prev: Message[]) => [...prev, { sender: 'sakha', text: paramNote }]);
     }
   }, [selectedParam, isHindi]);
@@ -75,7 +78,28 @@ export const AskSakhaDrawer: React.FC<AskSakhaDrawerProps> = ({
   const handleSend = async (userQuestion: string) => {
     if (!userQuestion.trim()) return;
 
-    const newMsgs: Message[] = [...messages, { sender: 'user', text: userQuestion }];
+    // Detect language using Digital India Bhashini TLD
+    let detectedLangName = '';
+    try {
+      const tld = await bhashiniDetectLanguage(userQuestion);
+      if (tld && tld.langCode && tld.confidence > 0.5) {
+        detectedLangName = LANGUAGE_CODE_TO_NAME[tld.langCode] || tld.langCode;
+      }
+    } catch (e) {
+      console.warn('TLD check error:', e);
+    }
+
+    const effectiveLang = detectedLangName || language;
+
+    const newMsgs: Message[] = [
+      ...messages,
+      {
+        sender: 'user',
+        text: userQuestion,
+        detectedLang: detectedLangName,
+        detectedEngine: detectedLangName ? 'Bhashini TLD' : undefined
+      }
+    ];
     setMessages(newMsgs);
     setInputVal('');
     setLoading(true);
@@ -91,14 +115,14 @@ export const AskSakhaDrawer: React.FC<AskSakhaDrawerProps> = ({
         contextText += `\nCurrently Selected Parameter: ${selectedParam.name} = ${selectedParam.value} ${selectedParam.unit} (Range: ${selectedParam.rangeText}, Status: ${selectedParam.status}). Explanation: ${selectedParam.simpleExplanationEn}`;
       }
 
-      const prompt = `You are Sakha, a kind, empathetic health companion helping a rural Indian patient understand their lab test in ${language}.
+      const prompt = `You are Sakha, a kind, empathetic health companion helping an Indian patient understand their lab test in: **${effectiveLang}**.
 Patient context: ${contextText || 'General medical report guidance.'}
 Patient question: "${userQuestion}"
 
 STRICT RULES:
-1. Speak in warm, simple, supportive everyday language (${language}).
-2. If language is Hindi, keep medical test names in English so patient can match their slip.
-3. NEVER diagnose any disease or recommend treatment or medication.
+1. Speak in warm, simple, supportive everyday language (${effectiveLang}).
+2. Keep medical test names in English in parentheses if helpful so patient can match their physical paper report.
+3. NEVER diagnose any disease or recommend treatment or prescription medication.
 4. Keep answers short (3-4 sentences max), clear, and reassuring.
 5. If asked for a medical diagnosis, politely state that you are an assistant to help explain terms, and advise them to consult their licensed doctor.`;
 
@@ -138,7 +162,15 @@ STRICT RULES:
         }
       }
 
-      setMessages((prev: Message[]) => [...prev, { sender: 'sakha', text: reply }]);
+      setMessages((prev: Message[]) => [
+        ...prev,
+        {
+          sender: 'sakha',
+          text: reply,
+          detectedLang: effectiveLang,
+          detectedEngine: 'Bhashini AI'
+        }
+      ]);
     } catch (err: any) {
       setMessages((prev: Message[]) => [
         ...prev,
@@ -154,7 +186,7 @@ STRICT RULES:
     }
   };
 
-  const handleSpeak = (text: string, idx: number) => {
+  const handleSpeak = (text: string, idx: number, msgLang?: string) => {
     if (speakingIdx === idx) {
       speechEngine.stop();
       setSpeakingIdx(null);
@@ -162,7 +194,8 @@ STRICT RULES:
     }
 
     setSpeakingIdx(idx);
-    speechEngine.speak(text, language, {
+    const speakLang = msgLang || language;
+    speechEngine.speak(text, speakLang, {
       onEnd: () => setSpeakingIdx(null),
       onError: () => setSpeakingIdx(null)
     });
@@ -177,7 +210,7 @@ STRICT RULES:
         bottom: 0,
         right: 0,
         width: '100%',
-        maxWidth: '460px',
+        maxWidth: '480px',
         height: '85vh',
         maxHeight: '680px',
         backgroundColor: '#ffffff',
@@ -208,11 +241,28 @@ STRICT RULES:
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
           <SakhaMascot size={42} mood="listening" />
           <div>
-            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#064e3b' }}>
-              {isHindi ? 'सखा से पूछें (Ask Sakha)' : 'Ask Sakha'}
-            </h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#064e3b' }}>
+                {isHindi ? 'सखा से पूछें (Ask Sakha)' : 'Ask Sakha'}
+              </h3>
+              <span
+                style={{
+                  backgroundColor: '#dbeafe',
+                  color: '#1e40af',
+                  fontSize: '0.68rem',
+                  fontWeight: 700,
+                  padding: '0.1rem 0.45rem',
+                  borderRadius: '999px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.2rem'
+                }}
+              >
+                <Sparkles size={10} /> भाषिणी TLD
+              </span>
+            </div>
             <p style={{ margin: 0, fontSize: '0.72rem', color: '#047857', fontWeight: 600 }}>
-              {isHindi ? 'आपका स्वास्थ्य मित्र • सरल व सुरक्षित' : 'Your Digital Health Companion'}
+              {isHindi ? '22 भाषाओं में बातचीत व आवाज़ • सुरक्षित स्वास्थ्य मित्र' : '22 Indian Languages & Voice Supported'}
             </p>
           </div>
         </div>
@@ -248,74 +298,103 @@ STRICT RULES:
           >
             <div
               style={{
-                backgroundColor: m.sender === 'user' ? '#059669' : '#f8fafc',
-                color: m.sender === 'user' ? '#ffffff' : '#0f172a',
                 padding: '0.75rem 1rem',
                 borderRadius: '14px',
-                borderBottomRightRadius: m.sender === 'user' ? '2px' : '14px',
-                borderBottomLeftRadius: m.sender === 'sakha' ? '2px' : '14px',
-                border: m.sender === 'sakha' ? '1px solid #e2e8f0' : 'none',
-                fontSize: '0.9rem',
+                backgroundColor: m.sender === 'user' ? '#064e3b' : '#f8fafc',
+                color: m.sender === 'user' ? '#ffffff' : '#0f172a',
+                border: m.sender === 'user' ? 'none' : '1px solid #e2e8f0',
+                fontSize: '0.88rem',
                 lineHeight: 1.5,
-                boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
+                boxShadow: '0 1px 3px rgba(0,0,0,0.06)'
               }}
             >
               {m.text}
             </div>
 
-            {m.sender === 'sakha' && (
-              <button
-                type="button"
-                onClick={() => handleSpeak(m.text, idx)}
-                style={{
-                  alignSelf: 'flex-start',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.3rem',
-                  background: 'none',
-                  border: 'none',
-                  color: speakingIdx === idx ? '#dc2626' : '#059669',
-                  fontSize: '0.75rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  padding: '0.1rem 0.3rem'
-                }}
-              >
-                <Volume2 size={13} />
-                <span>{speakingIdx === idx ? (isHindi ? 'रोकें' : 'Stop') : (isHindi ? 'सुनकर समझें' : 'Read Aloud')}</span>
-              </button>
-            )}
+            {/* Language Detection Tag & Spoken Audio Button */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                alignSelf: m.sender === 'user' ? 'flex-end' : 'flex-start'
+              }}
+            >
+              {m.detectedLang && (
+                <span
+                  style={{
+                    fontSize: '0.68rem',
+                    color: '#047857',
+                    backgroundColor: '#dcfce7',
+                    padding: '0.1rem 0.4rem',
+                    borderRadius: '4px',
+                    fontWeight: 600
+                  }}
+                >
+                  🇮🇳 {m.detectedEngine || 'भाषिणी'}: {m.detectedLang}
+                </span>
+              )}
+
+              {m.sender === 'sakha' && (
+                <button
+                  onClick={() => handleSpeak(m.text, idx, m.detectedLang)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: speakingIdx === idx ? '#059669' : '#64748b',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.25rem',
+                    fontSize: '0.72rem',
+                    fontWeight: 600,
+                    padding: '0.15rem 0.35rem',
+                    borderRadius: '4px'
+                  }}
+                  title="Listen in Indian Voice"
+                >
+                  <Volume2 size={14} className={speakingIdx === idx ? 'animate-pulse' : ''} />
+                  {speakingIdx === idx ? 'बोल रहे हैं...' : 'सुनें (Listen)'}
+                </button>
+              )}
+            </div>
           </div>
         ))}
 
         {loading && (
-          <div style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', backgroundColor: '#f1f5f9', borderRadius: '12px' }}>
-            <Loader2 size={16} className="spin-animation" color="#059669" />
-            <span style={{ fontSize: '0.82rem', color: '#475569' }}>
-              {isHindi ? 'सखा सोच रहा है...' : 'Sakha is thinking...'}
-            </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#059669', fontSize: '0.82rem', padding: '0.5rem' }}>
+            <Loader2 size={16} className="animate-spin" />
+            <span>सखा सोच रहे हैं (Sakha is preparing explanation)...</span>
           </div>
         )}
-
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Suggested Quick Questions */}
-      <div style={{ padding: '0.5rem 1rem', borderTop: '1px solid #f1f5f9', backgroundColor: '#fafbfc', overflowX: 'auto', whiteSpace: 'nowrap', display: 'flex', gap: '0.5rem' }}>
+      {/* Quick Suggestion Chips */}
+      <div
+        style={{
+          padding: '0.5rem 1rem',
+          display: 'flex',
+          gap: '0.4rem',
+          overflowX: 'auto',
+          borderTop: '1px solid #f1f5f9',
+          backgroundColor: '#fafafa'
+        }}
+      >
         {quickQuestions.map((q, i) => (
           <button
             key={i}
             onClick={() => handleSend(q)}
             style={{
-              backgroundColor: '#ffffff',
+              whiteSpace: 'nowrap',
+              fontSize: '0.75rem',
+              padding: '0.3rem 0.65rem',
+              borderRadius: '999px',
               border: '1px solid #cbd5e1',
-              borderRadius: '9999px',
-              padding: '0.35rem 0.75rem',
-              fontSize: '0.78rem',
-              fontWeight: 600,
-              color: '#1e293b',
+              backgroundColor: '#ffffff',
+              color: '#334155',
               cursor: 'pointer',
-              flexShrink: 0
+              fontWeight: 500
             }}
           >
             {q}
@@ -323,37 +402,56 @@ STRICT RULES:
         ))}
       </div>
 
-      {/* Input Box */}
-      <div style={{ padding: '0.75rem 1rem', borderTop: '1.5px solid #e2e8f0', display: 'flex', gap: '0.5rem', backgroundColor: '#ffffff' }}>
+      {/* Input Field */}
+      <div
+        style={{
+          padding: '0.75rem 1rem',
+          borderTop: '1.5px solid #e2e8f0',
+          backgroundColor: '#ffffff',
+          display: 'flex',
+          gap: '0.5rem'
+        }}
+      >
         <input
           type="text"
-          placeholder={isHindi ? 'सखा से अपना सवाल पूछें...' : 'Ask Sakha a question in Hindi or English...'}
           value={inputVal}
           onChange={(e) => setInputVal(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleSend(inputVal)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              handleSend(inputVal);
+            }
+          }}
+          placeholder={
+            isHindi
+              ? 'सखा से कोई भी सवाल पूछें (उदा: हीमोग्लोबिन क्या है?)...'
+              : `Ask Sakha in any of 22 Indian languages...`
+          }
           style={{
             flex: 1,
-            padding: '0.65rem 0.9rem',
-            borderRadius: '10px',
-            border: '1px solid #cbd5e1',
+            padding: '0.65rem 0.85rem',
+            borderRadius: '12px',
+            border: '1.5px solid #cbd5e1',
             fontSize: '0.88rem',
             outline: 'none'
           }}
         />
+
         <button
           onClick={() => handleSend(inputVal)}
           disabled={!inputVal.trim() || loading}
           style={{
-            backgroundColor: '#059669',
+            backgroundColor: '#064e3b',
             color: '#ffffff',
             border: 'none',
-            borderRadius: '10px',
+            borderRadius: '12px',
             padding: '0.65rem 1rem',
-            cursor: 'pointer',
+            cursor: inputVal.trim() && !loading ? 'pointer' : 'not-allowed',
+            opacity: inputVal.trim() && !loading ? 1 : 0.5,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center'
           }}
+          aria-label="Send message"
         >
           <Send size={18} />
         </button>
